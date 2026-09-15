@@ -1,0 +1,15 @@
+[build]
+  command = "node scripts/build.mjs"
+  publish = "public"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# Stackify OS entitlement enforcement (see ../stackify-netlify-entitlement).
+[[edge_functions]]
+  path = "/*"
+  function = "entitlement"
+
+[dev]
+  publish = "public"
+  command = "node scripts/build.mjs"

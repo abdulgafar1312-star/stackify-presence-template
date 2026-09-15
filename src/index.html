@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{business_name}}</title>
+<meta name="description" content="{{description}}">
+<meta property="og:title" content="{{business_name}}">
+<meta property="og:description" content="{{description}}">
+<meta property="og:type" content="website">
+<link rel="stylesheet" href="/styles.css">
+<style>
+  :root { --brand: {{brand_color}}; --accent: {{accent_color}}; }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="site-header">
+  <div class="container header-inner">
+    <a class="brand" href="/">{{business_name}}</a>
+    <nav aria-label="Primary">
+      <a href="#services">Services</a>
+      <a href="#contact">Contact</a>
+      {{whatsapp_nav}}
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+  <section class="hero">
+    <div class="container">
+      <p class="eyebrow">{{tagline}}</p>
+      <h1>{{business_name}}</h1>
+      <p class="lede">{{description}}</p>
+      <div class="actions">
+        <a class="btn btn-primary" href="#contact">Get in touch</a>
+        {{whatsapp_button}}
+      </div>
+    </div>
+  </section>
+
+  <section id="services" class="section">
+    <div class="container">
+      <h2>What we do</h2>
+      <div class="cards">
+        {{service_cards}}
+      </div>
+    </div>
+  </section>
+
+  <section id="contact" class="section section-alt">
+    <div class="container contact">
+      <div>
+        <h2>Contact</h2>
+        <ul class="contact-list">
+          <li><strong>Phone</strong> <a href="tel:{{phone_raw}}">{{phone}}</a></li>
+          <li><strong>Email</strong> <a href="mailto:{{email}}">{{email}}</a></li>
+          <li><strong>Location</strong> {{address}}</li>
+        </ul>
+      </div>
+      <form class="contact-form" onsubmit="return false;">
+        <h3>Send an enquiry</h3>
+        <label>Name <input type="text" name="name" autocomplete="name" required></label>
+        <label>Email <input type="email" name="email" autocomplete="email" required></label>
+        <label>Message <textarea name="message" rows="4" required></textarea></label>
+        <button class="btn btn-primary" type="submit">Send</button>
+        <p class="note" id="form-note" hidden></p>
+      </form>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="container footer-inner">
+    <p>&copy; <span id="year"></span> {{business_name}}. All rights reserved.</p>
+    <p class="managed">Managed by <a href="https://stackify.com" rel="noopener">Stackify OS</a></p>
+  </div>
+</footer>
+
+<script src="/main.js" defer></script>
+</body>
+</html>

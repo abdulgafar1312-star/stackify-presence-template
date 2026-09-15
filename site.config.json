@@ -1,0 +1,21 @@
+{
+  "business_name": "Pilot Business A",
+  "tagline": "Quality you can trust",
+  "description": "We provide professional services to customers across Accra and beyond. This website is managed by Stackify OS.",
+  "brand_color": "#0f766e",
+  "accent_color": "#f59e0b",
+  "phone": "+233 20 000 0000",
+  "whatsapp": "+233200000000",
+  "email": "hello@example.com",
+  "address": "Accra, Ghana",
+  "services": [
+    { "title": "Service One", "body": "A short description of what this service includes and who it is for." },
+    { "title": "Service Two", "body": "A short description of what this service includes and who it is for." },
+    { "title": "Service Three", "body": "A short description of what this service includes and who it is for." }
+  ],
+  "social": {
+    "facebook": "",
+    "instagram": "",
+    "x": ""
+  }
+}

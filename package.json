@@ -1,0 +1,15 @@
+{
+  "name": "stackify-presence-template",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Standardized, configurable Stackify Presence website template with Stackify OS entitlement enforcement.",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "sync:entitlement": "node scripts/sync-entitlement.mjs",
+    "dev": "netlify dev"
+  },
+  "devDependencies": {
+    "@netlify/edge-functions": "^2.11.1"
+  }
+}
