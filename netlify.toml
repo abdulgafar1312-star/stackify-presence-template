@@ -5,6 +5,13 @@
 [build.environment]
   NODE_VERSION = "20"
 
+# Stackify OS storefront proxy. Declared before the catch-all so /api/shop/*
+# is handled here; this function terminates the request and never falls through.
+# It holds the site secret server-side, so the page bundle never carries it.
+[[edge_functions]]
+  path = "/api/shop/*"
+  function = "shop"
+
 # Stackify OS entitlement enforcement (see ../stackify-netlify-entitlement).
 [[edge_functions]]
   path = "/*"

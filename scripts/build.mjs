@@ -104,17 +104,27 @@ const replacements = {
 	"{{whatsapp_button}}": whatsappUrl
 		? `<a class="btn btn-ghost" href="${escapeHtml(whatsappUrl)}" rel="noopener">Chat on WhatsApp</a>`
 		: "",
+	// The shop is only linked when the site is entitled to sell. The pages are
+	// always built so a mid-build entitlement change cannot leave a dead link.
+	"{{shop_nav}}": config.shop_enabled
+		? `<a href="/shop">Shop</a>`
+		: "",
 };
 
-let html = readFileSync(join(SRC, "index.html"), "utf8");
-for (const [token, value] of Object.entries(replacements)) {
-	html = html.split(token).join(value);
+function render(source) {
+	let html = readFileSync(join(SRC, source), "utf8");
+	for (const [token, value] of Object.entries(replacements)) {
+		html = html.split(token).join(value);
+	}
+	return html;
 }
 
 rmSync(OUT, { recursive: true, force: true });
 mkdirSync(OUT, { recursive: true });
-writeFileSync(join(OUT, "index.html"), html, "utf8");
+writeFileSync(join(OUT, "index.html"), render("index.html"), "utf8");
+writeFileSync(join(OUT, "shop.html"), render("shop.html"), "utf8");
 cpSync(join(SRC, "styles.css"), join(OUT, "styles.css"));
 cpSync(join(SRC, "main.js"), join(OUT, "main.js"));
+cpSync(join(SRC, "shop.js"), join(OUT, "shop.js"));
 
 console.log(`Built ${config.business_name} -> public/`);
