@@ -73,8 +73,7 @@ export default async function handler(request: Request, context: Context): Promi
 	const timer = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
 	let upstream: Response;
 	try {
-		upstream = await fetch(`${base}/${route.method_path}`, {
-			method: "POST",
+		upstream = await fetch(`${base}/${route.method_path}`, {			method: "POST",
 			headers: {
 				"content-type": "application/x-www-form-urlencoded",
 				accept: "application/json",
@@ -191,6 +190,7 @@ async function readFields(request: Request, url: URL): Promise<Record<string, st
 /**
  * The API base is the content endpoint with the method segment removed. A
  * dedicated variable wins when set, so the two can point at different hosts.
+ * The returned base never has a trailing slash; callers join with "/".
  */
 function resolveBase(): string | null {
 	const explicit = Netlify.env.get("STACKIFY_SHOP_ENDPOINT");
@@ -203,7 +203,7 @@ function resolveBase(): string | null {
 	const index = content.indexOf(marker);
 	if (index === -1) return null;
 
-	return content.slice(0, index) + marker;
+	return (content.slice(0, index) + marker).replace(/\/+$/, "");
 }
 
 function json(body: unknown, status: number, extraHeaders: Record<string, string> = {}): Response {
