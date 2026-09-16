@@ -16,7 +16,49 @@ const ROOT = join(__dirname, "..");
 const SRC = join(ROOT, "src");
 const OUT = join(ROOT, "public");
 
-const config = JSON.parse(readFileSync(join(ROOT, "site.config.json"), "utf8"));
+const localConfig = JSON.parse(readFileSync(join(ROOT, "site.config.json"), "utf8"));
+
+// When Stackify OS is connected, the site build pulls the client's published
+// content. Otherwise the checked-in site.config.json is used.
+async function loadConfig() {
+	const endpoint = process.env.STACKIFY_CONTENT_ENDPOINT;
+	const websiteId = process.env.STACKIFY_WEBSITE_ID;
+	const secret = process.env.STACKIFY_SITE_SECRET;
+
+	if (!endpoint || !websiteId || !secret) {
+		console.log("Using local site.config.json (Stackify content not configured).");
+		return localConfig;
+	}
+
+	try {
+		const body = new URLSearchParams({ website_id: websiteId, site_secret: secret });
+		const response = await fetch(endpoint, {
+			method: "POST",
+			headers: { "content-type": "application/x-www-form-urlencoded" },
+			body: body.toString(),
+		});
+		if (!response.ok) throw new Error(`HTTP ${response.status}`);
+		const payload = await response.json();
+		const content = payload.message || payload;
+		if (!content || !content.business_name) throw new Error("no content returned");
+		console.log(`Using Stackify content for ${websiteId} (revision ${content.revision}).`);
+		return {
+			...localConfig,
+			...content,
+			services: content.services && content.services.length ? content.services : localConfig.services,
+			social: {
+				facebook: content.social_facebook || "",
+				instagram: content.social_instagram || "",
+				x: content.social_x || "",
+			},
+		};
+	} catch (error) {
+		console.warn(`Could not fetch Stackify content (${error.message}); falling back to site.config.json.`);
+		return localConfig;
+	}
+}
+
+const config = await loadConfig();
 
 const escapeHtml = (value) =>
 	String(value ?? "")
