@@ -37,6 +37,14 @@ const DEFAULT_TTL_SECONDS = 900; // 15 minutes
 const DEFAULT_FAIL_OPEN_SECONDS = 3600; // 1 hour
 const FETCH_TIMEOUT_MS = 3000;
 
+// NOTE: Netlify.env is read inside the handler. Reading it at module scope is
+// not reliable across the edge runtime, which silently falls back to defaults.
+function envInt(name: string, fallback: number): number {
+	const raw = Netlify.env.get(name);
+	const parsed = raw ? Number.parseInt(raw, 10) : Number.NaN;
+	return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
 export default async function handler(request: Request, context: Context): Promise<Response> {
 	// Only gate navigations that want HTML. Everything else passes untouched.
 	if (request.method !== "GET" && request.method !== "HEAD") return context.next();
@@ -55,20 +63,24 @@ export default async function handler(request: Request, context: Context): Promi
 	const cacheKey = `https://stackify.internal/entitlement/${websiteId}`;
 	const cached = await readCache(context, cacheKey);
 	const now = Date.now();
-	const ttlMs = DEFAULT_TTL_SECONDS * 1000;
-	const failOpenMs = DEFAULT_FAIL_OPEN_SECONDS * 1000;
+	const ttlMs = envInt("STACKIFY_ENTITLEMENT_TTL_SECONDS", DEFAULT_TTL_SECONDS) * 1000;
+	const failOpenSeconds = envInt(
+		"STACKIFY_ENTITLEMENT_FAIL_OPEN_SECONDS",
+		DEFAULT_FAIL_OPEN_SECONDS,
+	);
+	const failOpenMs = failOpenSeconds * 1000;
 
 	// Use a fresh cached entitlement without contacting Stackify.
 	if (cached && now - cached.fetched_at < ttlMs && (await verify(cached.entitlement, secret))) {
-		return decide(cached.entitlement, context);
+		return decide(cached.entitlement, context, "cache-fresh");
 	}
 
 	// Try a fresh fetch.
 	try {
 		const entitlement = await fetchEntitlement(endpoint, websiteId, secret);
 		if (entitlement && (await verify(entitlement, secret))) {
-			await writeCache(context, cacheKey, { entitlement, fetched_at: now });
-			return decide(entitlement, context);
+			await writeCache(context, cacheKey, { entitlement, fetched_at: now }, failOpenSeconds);
+			return decide(entitlement, context, "fetched");
 		}
 		console.warn("[stackify] entitlement signature invalid; using cache if available");
 	} catch (error) {
@@ -78,7 +90,7 @@ export default async function handler(request: Request, context: Context): Promi
 	// Fetch failed: honour the last verified status within the fail-open window.
 	if (cached && now - cached.fetched_at < failOpenMs && (await verify(cached.entitlement, secret))) {
 		console.warn("[stackify] serving from stale entitlement (fail-open window)");
-		return decide(cached.entitlement, context);
+		return decide(cached.entitlement, context, "cache-stale");
 	}
 
 	// No usable entitlement at all: allow the first render rather than block a
@@ -93,16 +105,36 @@ export default async function handler(request: Request, context: Context): Promi
 	return maintenanceResponse();
 }
 
-function decide(entitlement: Entitlement, context: Context): Response {
+async function decide(
+	entitlement: Entitlement,
+	context: Context,
+	source: "cache-fresh" | "cache-stale" | "fetched",
+): Promise<Response> {
 	switch (entitlement.status) {
 		case "active":
-		case "grace":
-			return context.next();
+		case "grace": {
+			const response = await context.next();
+			return withDiagnostics(response, entitlement, "allow", source);
+		}
 		case "suspended":
 		case "inactive":
 		default:
-			return suspensionResponse();
+			return withDiagnostics(suspensionResponse(), entitlement, "suspend", source);
 	}
+}
+
+function withDiagnostics(
+	response: Response,
+	entitlement: Entitlement,
+	decision: string,
+	source: string,
+): Response {
+	const headers = new Headers(response.headers);
+	headers.set("x-stackify-decision", decision);
+	headers.set("x-stackify-status", entitlement.status);
+	headers.set("x-stackify-source", source);
+	headers.set("x-stackify-website", entitlement.website_id);
+	return new Response(response.body, { status: response.status, headers });
 }
 
 function wantsHtml(request: Request): boolean {
@@ -130,8 +162,13 @@ async function fetchEntitlement(
 			signal: controller.signal,
 		});
 		if (!response.ok) return null;
-		const payload = (await response.json()) as Partial<Entitlement> & { error?: string };
-		if (payload.error || !payload.status) return null;
+		const raw = (await response.json()) as Record<string, unknown> | null;
+		if (!raw || typeof raw !== "object") return null;
+		// Frappe wraps whitelisted method responses in { "message": ... }.
+		const payload = ("message" in raw ? raw.message : raw) as
+			| (Partial<Entitlement> & { error?: string })
+			| null;
+		if (!payload || payload.error || !payload.status) return null;
 		return payload as Entitlement;
 	} finally {
 		clearTimeout(timer);
@@ -163,15 +200,21 @@ async function readCache(context: Context, key: string): Promise<CacheEntry | nu
 	}
 }
 
-async function writeCache(context: Context, key: string, entry: CacheEntry): Promise<void> {
+async function writeCache(
+	context: Context,
+	key: string,
+	entry: CacheEntry,
+	failOpenSeconds: number,
+): Promise<void> {
 	try {
 		await context.cache.set(
 			key,
 			new Response(JSON.stringify(entry), {
 				headers: {
 					"content-type": "application/json",
-					// Cache for the full fail-open window; freshness is tracked in the body.
-					"cache-control": `public, max-age=${DEFAULT_FAIL_OPEN_SECONDS}`,
+					// Retain the entry for the full fail-open window; freshness is
+					// tracked in the body so we can still serve it if Stackify is down.
+					"cache-control": `public, max-age=${failOpenSeconds}`,
 				},
 			}),
 		);
